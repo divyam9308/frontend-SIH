@@ -1,0 +1,2 @@
+import { dashboardData } from '../data/demo/dashboardData'; import type { DashboardData } from '../types/dashboard'; import type { DashboardFilters } from '../types/filters';
+const copy=():DashboardData=>structuredClone(dashboardData); export const getDashboardData=(filters?:DashboardFilters)=>{void filters;return copy()}; export const refreshDashboardData=(filters?:DashboardFilters)=>{void filters;return copy()};

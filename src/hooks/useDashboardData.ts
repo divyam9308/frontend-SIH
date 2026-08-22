@@ -1,0 +1,2 @@
+import { useCallback,useState } from 'react'; import { getDashboardData,refreshDashboardData } from '../services/dashboardService'; import type { DashboardData } from '../types/dashboard'; import type { DashboardFilters } from '../types/filters';
+export const useDashboardData=(filters?:DashboardFilters)=>{const [data,setData]=useState<DashboardData>(()=>getDashboardData(filters)); const refresh=useCallback(()=>setData(refreshDashboardData(filters)),[filters]); return {data,refresh}}
