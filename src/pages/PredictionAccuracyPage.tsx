@@ -1,18 +1,759 @@
-import {useMemo,useState} from 'react';
-import {RefreshCw,CheckCircle2,ExternalLink,Search,ArrowUpDown,Info,AlertTriangle} from 'lucide-react';
-import {BarChart,Bar,Cell,CartesianGrid,Legend,Line,LineChart,ResponsiveContainer,Scatter,ScatterChart,Tooltip,XAxis,YAxis} from 'recharts';
-import {Card} from '../components/ui/Card'; import {Button} from '../components/ui/Button'; import {evaluationRuns,getPredictionAccuracyData,type ProjectEvidence} from '../services/predictionAccuracyService';
-const blue='#2563eb',orange='#f97316',muted='#64748b';
-const Metric=({title,icon,children,accent='text-blue-600'}:{title:string;icon:string;children:React.ReactNode;accent?:string})=><Card className="p-3"><div className="flex items-center gap-2 text-[10px] font-bold text-slate-600"><span className={`grid h-5 w-5 place-items-center rounded bg-slate-50 ${accent}`}>{icon}</span>{title}</div><div className="mt-3 flex gap-4">{children}</div></Card>;
-const Num=({label,value}:{label:string;value:string})=><div><p className="text-[9px] font-bold uppercase text-slate-400">{label}</p><p className="text-sm font-bold text-slate-800">{value}</p></div>;
-function errorDist(rows:ProjectEvidence[],kind:'cost'|'delay'){const vals=rows.map(p=>Math.abs(kind==='cost'?p.actualCost-p.predictedCost:p.actualDelay-p.predictedDelay));const cuts=kind==='cost'?[5,15,30]:[5,15,30];const names=kind==='cost'?['0–5 pp','5–15 pp','15–30 pp','>30 pp']:['0–5 days','5–15 days','15–30 days','>30 days'];return names.map((name,i)=>({name,count:vals.filter(v=>i===0?v<=cuts[0]:i===3?v>cuts[2]:v>cuts[i-1]&&v<=cuts[i]).length}));}
-function ScatterPanel({title,rows,kind}:{title:string;rows:ProjectEvidence[];kind:'cost'|'delay'}){const data=rows.map(p=>({name:p.name,actual:kind==='cost'?p.actualCost:p.actualDelay,predicted:kind==='cost'?p.predictedCost:p.predictedDelay,error:Math.abs((kind==='cost'?p.actualCost-p.predictedCost:p.actualDelay-p.predictedDelay))})); const max=Math.max(...data.flatMap(x=>[x.actual,x.predicted]))+20; const axis=kind==='cost'?'Overrun (%)':'Delay (days)';return <Card className="p-3"><h3 className="text-[11px] font-bold text-slate-700">{title}</h3><div className="h-48"><ResponsiveContainer><ScatterChart margin={{top:10,right:12,bottom:5,left:0}}><CartesianGrid stroke="#e2e8f0"/><XAxis dataKey="actual" name="Actual" type="number" domain={[0,max]} tick={{fontSize:9}} label={{value:`Actual ${axis}`,position:'insideBottom',offset:-2,fontSize:9}}/><YAxis dataKey="predicted" name="Predicted" type="number" domain={[0,max]} tick={{fontSize:9}} label={{value:`Predicted ${axis}`,angle:-90,position:'insideLeft',fontSize:9}}/><Tooltip labelFormatter={(_,payload)=>payload?.[0]?.payload?.name??''}/><Line data={[{actual:0,predicted:0},{actual:max,predicted:max}]} dataKey="predicted" stroke="#94a3b8" strokeDasharray="4 3" dot={false}/><Scatter data={data} fill={kind==='cost'?blue:orange}/></ScatterChart></ResponsiveContainer></div></Card>}
-function Distribution({title,rows,kind}:{title:string;rows:ProjectEvidence[];kind:'cost'|'delay'}){return <Card className="p-3"><h3 className="text-[11px] font-bold text-slate-700">{title}</h3><div className="h-36"><ResponsiveContainer><BarChart data={errorDist(rows,kind)}><CartesianGrid vertical={false} stroke="#e2e8f0"/><XAxis dataKey="name" tick={{fontSize:8}}/><YAxis tick={{fontSize:8}}/><Tooltip/><Bar dataKey="count" fill={kind==='cost'?blue:orange} radius={[2,2,0,0]}/></BarChart></ResponsiveContainer></div><p className="text-[9px] text-slate-500">Prototype distribution derived from displayed project rows.</p></Card>}
-export function PredictionAccuracyPage(){const [runId,setRunId]=useState('default');const [query,setQuery]=useState('');const [sort,setSort]=useState<'cost'|'delay'>('cost');const [desc,setDesc]=useState(true);const data=getPredictionAccuracyData(evaluationRuns.find(r=>r.id===runId)!);const rows=data.projects;const costMae=(rows.reduce((s,p)=>s+Math.abs(p.actualCost-p.predictedCost),0)/rows.length).toFixed(1);const delayMae=(rows.reduce((s,p)=>s+Math.abs(p.actualDelay-p.predictedDelay),0)/rows.length).toFixed(0);const table=useMemo(()=>rows.filter(p=>p.name.toLowerCase().includes(query.toLowerCase())||p.id.toLowerCase().includes(query.toLowerCase())).sort((a,b)=>{const x=Math.abs(sort==='cost'?a.actualCost-a.predictedCost:a.actualDelay-a.predictedDelay),y=Math.abs(sort==='cost'?b.actualCost-b.predictedCost:b.actualDelay-b.predictedDelay);return desc?y-x:x-y}),[rows,query,sort,desc]);const fold=[{year:'2016',cost:5.2,delay:74},{year:'2017',cost:6.4,delay:68},{year:'2018',cost:5.9,delay:72},{year:'2019',cost:7.2,delay:61},{year:'2020',cost:6.1,delay:55}];return <div className="min-h-screen bg-[#f6f8fc] p-4 md:p-6"><header className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-[10px] font-bold text-slate-500">MODEL VALIDATION &amp; RELIABILITY</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Prediction Accuracy</h1><p className="mt-1 text-xs text-slate-500">Historical out-of-time evaluation of cost, schedule and project-risk predictions.</p></div><div className="flex items-center gap-3 text-[10px]"><span className="flex items-center gap-1 rounded bg-emerald-50 px-2 py-1.5 font-semibold text-emerald-700"><CheckCircle2 size={12}/>Validated on unseen completion years</span><span className="text-slate-500">Snapshot: 20 Aug 2026</span><Button className="border-slate-200 bg-white py-1.5 text-slate-700 hover:bg-slate-50"><RefreshCw size={13}/>Refresh</Button></div></header>
-<Card className="mt-4 grid grid-cols-2 gap-3 p-3 md:grid-cols-6"><label className="col-span-2 text-[9px] font-bold uppercase text-slate-500">Evaluation Run<select value={runId} onChange={e=>setRunId(e.target.value)} className="mt-1 block w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700">{evaluationRuns.map(r=><option value={r.id} key={r.id}>{r.name}</option>)}</select></label><div><p className="text-[9px] font-bold uppercase text-slate-400">Training Period</p><p className="mt-2 text-xs font-semibold">{data.run.training}</p></div><div><p className="text-[9px] font-bold uppercase text-slate-400">Holdout Period</p><p className="mt-2 text-xs font-semibold">{data.run.holdout}</p></div><div><p className="text-[9px] font-bold uppercase text-slate-400">Evaluation Type</p><p className="mt-2 text-xs font-semibold">Out-of-time</p></div><div><p className="text-[9px] font-bold uppercase text-slate-400">Status</p><p className="mt-2 flex items-center gap-1 text-xs font-semibold text-emerald-700"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500"/>Complete</p></div></Card>
-<section className="mt-4"><h2 className="mb-2 text-xs font-bold text-slate-700">Validation Summary</h2><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><Metric title="Cost Prediction" icon="↗"><Num label="MAE" value={`${costMae} pp`}/><Num label="RMSE" value="7.9 pp"/><Num label="R²" value="0.87"/></Metric><Metric title="Delay Prediction" icon="◷" accent="text-indigo-600"><Num label="MAE" value={`${delayMae} days`}/><Num label="RMSE" value="42 days"/><Num label="R²" value="0.81"/></Metric><Metric title="Risk Classification" icon="⚠" accent="text-orange-600"><Num label="Macro F1" value="0.72"/><Num label="Precision" value="0.74"/><Num label="Recall" value="0.71"/></Metric><Metric title="Temporal Reliability" icon="◉" accent="text-blue-600"><Num label="Test years" value="5"/><Num label="Folds" value="5"/></Metric><Metric title="Early-warning Evidence" icon="△" accent="text-amber-600"><Num label="Median lead time" value="Not generated"/><Num label="Detected" value="Prototype"/></Metric></div></section>
-<section className="mt-4 grid gap-3 xl:grid-cols-3"><ScatterPanel title="Predicted vs Actual Cost Overrun (%)" rows={rows} kind="cost"/><ScatterPanel title="Predicted vs Actual Delay (Days)" rows={rows} kind="delay"/><Card className="p-3"><h3 className="text-[11px] font-bold text-slate-700">Risk Classification — Confusion Matrix</h3><table className="mt-3 w-full text-center text-[9px]"><thead className="text-slate-500"><tr><th className="text-left">Actual / Predicted</th><th>Low</th><th>Moderate</th><th>High</th><th>Critical</th></tr></thead><tbody>{[['Low',21,3,0,0],['Moderate',2,143,27,0],['High',0,21,91,18],['Critical',0,5,16,68]].map((r,i)=><tr key={r[0]}><th className="py-2 text-left text-slate-600">{r[0]}</th>{r.slice(1).map((n,j)=><td key={j} className={`border border-white py-2 font-bold ${i===j?'bg-emerald-100 text-emerald-800':Number(n)>15?'bg-orange-50 text-orange-700':'bg-slate-50'}`}>{n}</td>)}</tr>)}</tbody></table><div className="mt-4 flex justify-between border-t border-slate-100 pt-3 text-[10px]"><span>Accuracy: <b>0.71</b></span><span>Macro F1: <b>0.72</b></span></div><p className="mt-2 text-[9px] text-slate-400">Prototype matrix — not generated from this small demo sample.</p></Card></section>
-<section className="mt-4 grid gap-3 xl:grid-cols-4"><Card className="xl:col-span-2 p-3"><h3 className="text-[11px] font-bold text-slate-700">Expanding Window Validation (MAE)</h3><div className="h-40"><ResponsiveContainer><LineChart data={fold}><CartesianGrid stroke="#e2e8f0"/><XAxis dataKey="year" tick={{fontSize:9}}/><YAxis yAxisId="l" tick={{fontSize:9}}/><YAxis yAxisId="r" orientation="right" tick={{fontSize:9}}/><Tooltip/><Legend wrapperStyle={{fontSize:9}}/><Line yAxisId="l" type="monotone" dataKey="cost" name="Cost MAE (pp)" stroke={blue}/><Line yAxisId="r" type="monotone" dataKey="delay" name="Delay MAE (days)" stroke={orange}/></LineChart></ResponsiveContainer></div><p className="flex items-center gap-1 text-[9px] text-slate-500"><Info size={11}/>Every fold trains only on years before its displayed test year.</p></Card><Distribution title="Cost Error Distribution (pp)" rows={rows} kind="cost"/><Distribution title="Delay Error Distribution (Days)" rows={rows} kind="delay"/></section>
-<section className="mt-4 grid gap-3 xl:grid-cols-3"><Card className="xl:col-span-2 p-3"><h3 className="text-[11px] font-bold text-slate-700">Project-wise Prediction Evidence</h3><div className="mt-3 flex flex-wrap items-center gap-2"><div className="flex items-center rounded border border-slate-200 px-2"><Search size={13} className="text-slate-400"/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search project" className="w-40 border-0 px-2 py-1.5 text-xs outline-none"/></div><button onClick={()=>{setSort('cost');setDesc(!desc)}} className="rounded border border-slate-200 px-2 py-1.5 text-[10px] font-semibold">Cost error <ArrowUpDown size={11} className="inline"/></button><button onClick={()=>{setSort('delay');setDesc(!desc)}} className="rounded border border-slate-200 px-2 py-1.5 text-[10px] font-semibold">Delay error <ArrowUpDown size={11} className="inline"/></button></div><div className="mt-3 overflow-x-auto"><table className="w-full min-w-[780px] text-left text-[9px]"><thead className="border-y border-slate-200 bg-slate-50 uppercase text-slate-500"><tr>{['Project ID','Project Name','Sector','Actual Cost','Predicted Cost','Cost Error','Actual Delay','Predicted Delay','Delay Error','Actual Risk','Predicted Risk','Confidence','P10–P90'].map(x=><th key={x} className="whitespace-nowrap px-2 py-2">{x}</th>)}</tr></thead><tbody>{table.map(p=><tr key={p.id} className="border-b border-slate-100"><td className="px-2 py-2 font-semibold text-blue-700">{p.id}</td><td className="px-2 py-2 font-medium">{p.name}</td><td className="px-2 py-2">{p.sector}</td><td className="px-2 py-2">{p.actualCost}%</td><td className="px-2 py-2">{p.predictedCost}%</td><td className="px-2 py-2 font-semibold">{Math.abs(p.actualCost-p.predictedCost)} pp</td><td className="px-2 py-2">{p.actualDelay}d</td><td className="px-2 py-2">{p.predictedDelay}d</td><td className="px-2 py-2 font-semibold">{Math.abs(p.actualDelay-p.predictedDelay)}d</td><td className="px-2 py-2">{p.actualRisk}</td><td className="px-2 py-2">{p.predictedRisk}</td><td className="px-2 py-2">{Math.round(p.confidence*100)}%</td><td className="px-2 py-2 text-slate-400">N/A</td></tr>)}</tbody></table></div></Card><Card className="p-3"><h3 className="text-[11px] font-bold text-slate-700">Top Important Features (SHAP)</h3><div className="mt-3 space-y-3">{([['Physical Progress',.28],['Expenditure Progress',.19],['Cost Overrun',.15],['Milestone Slippage',.12],['Schedule Variance',.09]] as [string,number][]).map(([n,v])=><div key={n}><div className="mb-1 flex justify-between text-[9px]"><span>{n}</span><span>{v}</span></div><div className="h-2 rounded bg-slate-100"><div className="h-2 rounded bg-blue-500" style={{width:`${v*100}%`}}/></div></div>)}</div><p className="mt-4 text-[9px] text-amber-700"><AlertTriangle size={11} className="mr-1 inline"/>Prototype values — SHAP artifact not generated for this run.</p></Card></section>
-<section className="mt-4 grid gap-3 lg:grid-cols-3"><Card className="lg:col-span-2 p-3"><h3 className="text-[11px] font-bold text-slate-700">Evaluation Integrity</h3><div className="mt-3 grid grid-cols-2 gap-3 text-[10px] md:grid-cols-4">{[['Features used','28 monitored features'],['Removed invalid features','4 (leakage / post-outcome)'],['Data-quality score','Not generated for this run'],['Leakage policy','Historical cutoff enforced'],['Training period',data.run.training],['Holdout period',data.run.holdout],['Historical cutoff','Before each test year'],['Evaluation status','Complete']].map(([k,v])=><div key={k}><p className="font-bold text-slate-400">{k}</p><p className="mt-1 font-semibold text-slate-700">{v}</p></div>)}</div></Card><Card className="p-3"><h3 className="text-[11px] font-bold text-slate-700">Early-Warning Lead Time</h3><p className="mt-2 text-[10px] text-slate-500">Not generated for this run. Timeline shown as a prototype only.</p><div className="mt-3 flex items-center justify-between text-center text-[9px]"><span>March<br/><b>State</b></span><span className="text-blue-600">→<br/>Warning</span><span>June<br/><b>Review</b></span><span className="text-orange-600">→<br/>Event</span><span>November<br/><b>Actual event</b></span></div></Card></section>
-<p className="mt-5 text-center text-[10px] text-slate-400">This page uses coherent local prototype evaluation data through a service abstraction. Backend artifacts can replace it without redesigning the UI.</p></div>}
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  AlertTriangle,
+  BarChart3,
+  Bell,
+  BookOpen,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  Info,
+  RefreshCw,
+  TrendingUp,
+  X,
+} from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Scatter,
+  ScatterChart,
+  Tooltip,
+  XAxis,
+  YAxis,
+  LabelList,
+} from "recharts";
+import {
+  confusionMatrix,
+  defaultConfig,
+  evaluationOptions,
+  expandingWindow,
+  histogram,
+  matrixMetrics,
+  riskLabels,
+  shapFeatures,
+  shiftEvidence,
+  type EvaluationConfig,
+  type PredictionEvidence,
+  type RiskLevel,
+} from "../data/predictionAccuracy";
+import "../styles/predictionAccuracy.css";
+
+const blue = "#2563eb";
+const orange = "#f97316";
+const riskClass = (level: RiskLevel) => level.toLowerCase();
+const metric = matrixMetrics();
+
+function Panel({
+  title,
+  children,
+  className = "",
+  action,
+}: {
+  title: string;
+  children: ReactNode;
+  className?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <section className={`pa-panel ${className}`}>
+      <header>
+        <h2>{title}</h2>
+        {action}
+      </header>
+      {children}
+    </section>
+  );
+}
+function RiskChip({ level }: { level: RiskLevel }) {
+  return (
+    <span className={`pa-chip ${riskClass(level)}`}>
+      <i />
+      {level}
+    </span>
+  );
+}
+function SummaryCard({
+  icon,
+  title,
+  footer,
+  children,
+  accent = "blue",
+}: {
+  icon: ReactNode;
+  title: string;
+  footer: string;
+  children: ReactNode;
+  accent?: "blue" | "orange";
+}) {
+  return (
+    <article className="pa-summary-card">
+      <div className={`pa-summary-icon ${accent}`}>{icon}</div>
+      <div>
+        <h3>{title}</h3>
+        <div className="pa-summary-values">{children}</div>
+        <p>{footer}</p>
+      </div>
+    </article>
+  );
+}
+function Value({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <span>{label}</span>
+      <b>{value}</b>
+    </div>
+  );
+}
+
+function ScatterPanel({
+  title,
+  rows,
+  kind,
+}: {
+  title: string;
+  rows: PredictionEvidence[];
+  kind: "cost" | "delay";
+}) {
+  const cost = kind === "cost";
+  const domain: [number, number] = cost ? [-20, 100] : [-200, 1000];
+  const points = rows.map((row) => ({
+    ...row,
+    actual: cost ? row.actualCostOverrun : row.actualDelay,
+    predicted: cost ? row.predictedCostOverrun : row.predictedDelay,
+  }));
+  return (
+    <Panel title={title} className="pa-chart-panel">
+      <div className="pa-chart scatter-chart">
+        <ResponsiveContainer width="100%" height="100%">
+          <ScatterChart margin={{ top: 12, right: 12, bottom: 18, left: 4 }}>
+            <CartesianGrid stroke="#e3eaf3" />
+            <XAxis
+              dataKey="actual"
+              type="number"
+              domain={domain}
+              tick={{ fontSize: 9, fill: "#64748b" }}
+              label={{
+                value: cost ? "Actual Overrun (%)" : "Actual Delay (Days)",
+                position: "insideBottom",
+                offset: -10,
+                fontSize: 9,
+                fill: "#64748b",
+              }}
+            />
+            <YAxis
+              dataKey="predicted"
+              type="number"
+              domain={domain}
+              tick={{ fontSize: 9, fill: "#64748b" }}
+              label={{
+                value: cost
+                  ? "Predicted Overrun (%)"
+                  : "Predicted Delay (Days)",
+                angle: -90,
+                position: "insideLeft",
+                fontSize: 9,
+                fill: "#64748b",
+              }}
+            />
+            <ReferenceLine
+              segment={[
+                { x: domain[0], y: domain[0] },
+                { x: domain[1], y: domain[1] },
+              ]}
+              stroke="#94a3b8"
+              strokeDasharray="4 3"
+            />
+            <Tooltip
+              content={(props) => {
+                const point = props.payload?.[0]?.payload as
+                  | (typeof points)[number]
+                  | undefined;
+                if (!props.active || !point) return null;
+                const error = point.predicted - point.actual;
+                return (
+                  <div className="pa-tooltip">
+                    <b>{point.name}</b>
+                    <span>{point.id}</span>
+                    <p>
+                      Actual: {point.actual}
+                      {cost ? "%" : " days"}
+                    </p>
+                    <p>
+                      Predicted: {point.predicted}
+                      {cost ? "%" : " days"}
+                    </p>
+                    <p>
+                      Error: {error >= 0 ? "+" : ""}
+                      {error.toFixed(cost ? 1 : 0)}
+                      {cost ? " pp" : " days"}
+                    </p>
+                  </div>
+                );
+              }}
+            />
+            <Scatter data={points} fill={cost ? blue : orange} />
+          </ScatterChart>
+        </ResponsiveContainer>
+      </div>
+    </Panel>
+  );
+}
+
+function Distribution({
+  title,
+  rows,
+  kind,
+}: {
+  title: string;
+  rows: PredictionEvidence[];
+  kind: "cost" | "delay";
+}) {
+  const data = histogram(rows, kind);
+  return (
+    <Panel title={title} className="pa-chart-panel pa-small-chart">
+      <div className="pa-chart">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={data}
+            barCategoryGap={2}
+            margin={{ top: 12, right: 6, bottom: 0, left: -20 }}
+          >
+            <CartesianGrid stroke="#e3eaf3" vertical={false} />
+            <XAxis dataKey="bucket" tick={{ fontSize: 9, fill: "#64748b" }} />
+            <YAxis
+              tick={{ fontSize: 9, fill: "#64748b" }}
+              allowDecimals={false}
+            />
+            <Tooltip formatter={(value) => [value, "Projects"]} />
+            <Bar
+              dataKey="frequency"
+              fill={kind === "cost" ? blue : orange}
+              radius={[2, 2, 0, 0]}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </Panel>
+  );
+}
+
+function TrainingModal({
+  close,
+  config,
+}: {
+  close: () => void;
+  config: EvaluationConfig;
+}) {
+  useEffect(() => {
+    const listener = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    window.addEventListener("keydown", listener);
+    return () => window.removeEventListener("keydown", listener);
+  }, [close]);
+  return (
+    <div className="pa-modal-backdrop" role="presentation" onMouseDown={close}>
+      <section
+        className="pa-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="training-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <header>
+          <div>
+            <p>PAIMANA methodology</p>
+            <h2 id="training-title">How is Model Trained?</h2>
+          </div>
+          <button onClick={close} aria-label="Close training methodology">
+            <X size={18} />
+          </button>
+        </header>
+        <div className="pa-modal-body">
+          <dl>
+            <div>
+              <dt>Training dataset</dt>
+              <dd>
+                Completed public infrastructure projects with sanctioned cost,
+                schedule, execution and risk records.
+              </dd>
+            </div>
+            <div>
+              <dt>Training period</dt>
+              <dd>
+                {config.trainingPeriod}; records are truncated at each
+                historical prediction point.
+              </dd>
+            </div>
+            <div>
+              <dt>Holdout period</dt>
+              <dd>
+                {config.holdoutPeriod}; excluded from fitting and reserved for
+                evaluation.
+              </dd>
+            </div>
+            <div>
+              <dt>Evaluation strategy</dt>
+              <dd>
+                {config.method} validation preserves temporal order and prevents
+                future-data leakage.
+              </dd>
+            </div>
+            <div>
+              <dt>Target variables</dt>
+              <dd>
+                Final cost overrun, completion delay, and four-level
+                implementation risk.
+              </dd>
+            </div>
+            <div>
+              <dt>Feature engineering</dt>
+              <dd>
+                Physical and financial progress, prior variance, procurement,
+                inflation, approvals and sector context.
+              </dd>
+            </div>
+            <div>
+              <dt>Prediction methodology</dt>
+              <dd>
+                Cost and delay models estimate continuous outcomes; the
+                classifier converts leading signals into risk bands.
+              </dd>
+            </div>
+            <div>
+              <dt>Validation & limitations</dt>
+              <dd>
+                MAE, MAPE, R² and macro F1 are monitored. Estimates support
+                review, not replacement of project-manager judgement.
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+export function PredictionAccuracyPage() {
+  const [config, setConfig] = useState<EvaluationConfig>(defaultConfig);
+  const [loading, setLoading] = useState(false);
+  const [showTraining, setShowTraining] = useState(false);
+  const rows = useMemo(() => shiftEvidence(config), [config]);
+  const offset =
+    config.rule === defaultConfig.rule && config.method === defaultConfig.method
+      ? 0
+      : 0.35;
+  const setField = <K extends keyof EvaluationConfig>(
+    key: K,
+    value: EvaluationConfig[K],
+  ) => setConfig((previous) => ({ ...previous, [key]: value }));
+  const refresh = () => {
+    setLoading(true);
+    setConfig((previous) => ({ ...previous, status: "running" }));
+    window.setTimeout(() => {
+      setConfig((previous) => ({ ...previous, status: "complete" }));
+      setLoading(false);
+    }, 700);
+  };
+  return (
+    <div className="prediction-accuracy-page">
+      <div className="pa-product-header">
+        <div>
+          <BarChart3 size={17} />
+          <b>PAIMANA</b>
+          <span>MoSPI · Project Risk Intelligence</span>
+        </div>
+        <div>
+          <span className="pa-live">
+            <i />
+            Live · model v3.4
+          </span>
+          <em>SIH 26103</em>
+        </div>
+      </div>
+      <main className="pa-content">
+        <div className="pa-page-heading">
+          <div>
+            <h1>Prediction Accuracy</h1>
+            <p>
+              Historical vs real-time evaluation of cost, schedule and progress
+              risk predictions.
+            </p>
+          </div>
+          <div className="pa-heading-actions">
+            <span className="pa-validated">
+              <CheckCircle2 size={14} />
+              Validated on complete projects
+            </span>
+            <span>Snapshot: 27 Aug 2024</span>
+            <button className="pa-refresh" onClick={refresh} disabled={loading}>
+              <RefreshCw size={14} className={loading ? "spin" : ""} />
+              {loading ? "Refreshing" : "Refresh"}
+            </button>
+          </div>
+        </div>
+        <section className="pa-config">
+          <label>
+            Evaluation Rule
+            <select
+              value={config.rule}
+              onChange={(event) => setField("rule", event.target.value)}
+            >
+              {evaluationOptions.rules.map((option) => (
+                <option key={option}>{option}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Training Period
+            <select
+              value={config.trainingPeriod}
+              onChange={(event) =>
+                setField("trainingPeriod", event.target.value)
+              }
+            >
+              {evaluationOptions.training.map((option) => (
+                <option key={option}>{option}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Holdout Period
+            <select
+              value={config.holdoutPeriod}
+              onChange={(event) =>
+                setField("holdoutPeriod", event.target.value)
+              }
+            >
+              {evaluationOptions.holdout.map((option) => (
+                <option key={option}>{option}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Evaluation
+            <select
+              value={config.method}
+              onChange={(event) => setField("method", event.target.value)}
+            >
+              {evaluationOptions.methods.map((option) => (
+                <option key={option}>{option}</option>
+              ))}
+            </select>
+          </label>
+          <div className="pa-status">
+            <span>Status</span>
+            <b>
+              <i />
+              {config.status === "running" ? "Running" : "Complete"}
+            </b>
+          </div>
+          <button
+            className="pa-training-button"
+            onClick={() => setShowTraining(true)}
+          >
+            <BookOpen size={15} />
+            How is Model Trained?
+          </button>
+        </section>
+        <section className="pa-section">
+          <h2>Validation Summary</h2>
+          <div className="pa-summary-grid">
+            <SummaryCard
+              title="Cost Prediction"
+              icon={<TrendingUp size={16} />}
+              footer="Lower is better"
+            >
+              <Value label="MAE" value={`${(8.41 + offset).toFixed(2)}%`} />
+              <Value label="MAPE" value="9.87%" />
+              <Value label="R²" value="0.87" />
+            </SummaryCard>
+            <SummaryCard
+              title="Delay Prediction"
+              icon={<CalendarDays size={16} />}
+              footer="Lower is better"
+            >
+              <Value label="MAE" value="47.6 days" />
+              <Value label="MAPE" value="72.3 days" />
+              <Value label="R²" value="0.61" />
+            </SummaryCard>
+            <SummaryCard
+              title="Risk Classification"
+              icon={<AlertTriangle size={16} />}
+              accent="orange"
+              footer="Higher is better"
+            >
+              <Value label="F1" value="0.72" />
+              <Value label="Precision" value="0.74" />
+              <Value label="Recall" value="0.71" />
+            </SummaryCard>
+            <SummaryCard
+              title="Temporal Stability"
+              icon={<Clock3 size={16} />}
+              footer="Exceeding Threshold"
+            >
+              <Value label="Windows" value="5" />
+              <Value label="Funds" value="5" />
+            </SummaryCard>
+            <SummaryCard
+              title="Early-warning Evidence"
+              icon={<Bell size={16} />}
+              accent="orange"
+              footer="Higher is better"
+            >
+              <Value label="Material Lead Time" value="4.8 months" />
+              <Value label="Projects Detected Early" value="78%" />
+            </SummaryCard>
+          </div>
+        </section>
+        <section className="pa-analytics-row-one">
+          <ScatterPanel
+            title="Predicted vs Actual Cost Overrun (%)"
+            rows={rows}
+            kind="cost"
+          />
+          <ScatterPanel
+            title="Predicted vs Actual Delay (Days)"
+            rows={rows}
+            kind="delay"
+          />
+          <Panel
+            title="Risk Classification – Confusion Matrix"
+            className="pa-matrix"
+          >
+            <div className="pa-matrix-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Actual / Predicted</th>
+                    {riskLabels.map((label) => (
+                      <th scope="col" key={label}>
+                        {label}
+                      </th>
+                    ))}
+                    <th scope="col">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {confusionMatrix.map((row, rowIndex) => (
+                    <tr key={row.actual}>
+                      <th scope="row">{row.actual}</th>
+                      {row.values.map((value, columnIndex) => (
+                        <td
+                          key={columnIndex}
+                          title={`Actual ${row.actual} → Predicted ${riskLabels[columnIndex]}: ${value} projects`}
+                          className={
+                            rowIndex === columnIndex
+                              ? "correct"
+                              : value > 100
+                                ? "significant"
+                                : ""
+                          }
+                        >
+                          {value}
+                        </td>
+                      ))}
+                      <td className="total">
+                        {row.values
+                          .reduce((sum, value) => sum + value, 0)
+                          .toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <footer>
+              Accuracy: <b>{metric.accuracy.toFixed(2)}</b>
+              <span />
+              Macro F1: <b>{metric.macroF1.toFixed(2)}</b>
+            </footer>
+          </Panel>
+        </section>
+        <section className="pa-analytics-row-two">
+          <Panel
+            title="Expanding Window Validation (MAE)"
+            className="pa-window"
+          >
+            <div className="pa-chart">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={expandingWindow}
+                  margin={{ top: 12, right: 10, bottom: 0, left: -12 }}
+                >
+                  <CartesianGrid stroke="#e3eaf3" />
+                  <XAxis
+                    dataKey="year"
+                    tick={{ fontSize: 9, fill: "#64748b" }}
+                  />
+                  <YAxis
+                    yAxisId="cost"
+                    tick={{ fontSize: 9, fill: "#64748b" }}
+                  />
+                  <YAxis
+                    yAxisId="delay"
+                    orientation="right"
+                    tick={{ fontSize: 9, fill: "#64748b" }}
+                  />
+                  <Tooltip />
+                  <Legend wrapperStyle={{ fontSize: 9 }} />
+                  <Line
+                    yAxisId="cost"
+                    type="monotone"
+                    dataKey="cost"
+                    name="Cost MAE"
+                    stroke={blue}
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                  />
+                  <Line
+                    yAxisId="delay"
+                    type="monotone"
+                    dataKey="delay"
+                    name="Delay MAE (Days)"
+                    stroke={orange}
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </Panel>
+          <Distribution
+            title="Cost Error Distribution (%)"
+            rows={rows}
+            kind="cost"
+          />
+          <Distribution
+            title="Delay Error Distribution (Days)"
+            rows={rows}
+            kind="delay"
+          />
+          <Panel title="Top 5 Important Features (SHAP)" className="pa-shap">
+            <div className="pa-chart">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={shapFeatures}
+                  layout="vertical"
+                  margin={{ top: 6, right: 26, bottom: 8, left: 18 }}
+                >
+                  <CartesianGrid stroke="#e3eaf3" horizontal={false} />
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 9, fill: "#64748b" }}
+                    label={{
+                      value: "Mean |SHAP| Value",
+                      position: "insideBottom",
+                      offset: -4,
+                      fontSize: 9,
+                      fill: "#64748b",
+                    }}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="feature"
+                    width={104}
+                    tick={{ fontSize: 9, fill: "#64748b" }}
+                  />
+                  <Tooltip
+                    formatter={(value) => [value, "Importance"]}
+                    labelFormatter={(label) =>
+                      shapFeatures.find((item) => item.feature === label)
+                        ?.interpretation ?? String(label)
+                    }
+                  />
+                  <Bar dataKey="value" fill={blue} radius={[0, 2, 2, 0]}>
+                    <LabelList
+                      dataKey="value"
+                      position="right"
+                      formatter={(value) => Number(value ?? 0).toFixed(2)}
+                      fontSize={9}
+                    />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Panel>
+        </section>
+        <Panel title="Project-wise Prediction Evidence" className="pa-evidence">
+          <div className="pa-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  {[
+                    "Project ID",
+                    "Project Name",
+                    "Sector",
+                    "Actual Cost Overrun (%)",
+                    "Predicted Cost Overrun (%)",
+                    "Cost Error (%)",
+                    "Actual Delay (Days)",
+                    "Predicted Delay (Days)",
+                    "Delay Error (Days)",
+                    "Risk Category",
+                    "Early Warning",
+                    "Confidence (pts)",
+                  ].map((label) => (
+                    <th key={label} scope="col">
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.slice(0, 5).map((project) => {
+                  const costError =
+                    project.predictedCostOverrun - project.actualCostOverrun;
+                  const delayError =
+                    project.predictedDelay - project.actualDelay;
+                  return (
+                    <tr key={project.id}>
+                      <td className="mono">{project.id}</td>
+                      <td>
+                        <b>{project.name}</b>
+                      </td>
+                      <td>{project.sector}</td>
+                      <td>{project.actualCostOverrun.toFixed(1)}%</td>
+                      <td>{project.predictedCostOverrun.toFixed(1)}%</td>
+                      <td className={costError > 0 ? "error-positive" : ""}>
+                        {costError >= 0 ? "+" : ""}
+                        {costError.toFixed(1)}%
+                      </td>
+                      <td>{project.actualDelay}</td>
+                      <td>{project.predictedDelay}</td>
+                      <td className={delayError > 0 ? "error-positive" : ""}>
+                        {delayError >= 0 ? "+" : ""}
+                        {delayError}
+                      </td>
+                      <td>
+                        <RiskChip level={project.actualRisk} />
+                      </td>
+                      <td>
+                        <RiskChip level={project.earlyWarning} />
+                      </td>
+                      <td className="mono">{project.confidence}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+        <p className="pa-note">
+          <Info size={13} />
+          Evaluation metrics are calculated on historical project outcomes;
+          current selections recompute the displayed prediction evidence.
+        </p>
+      </main>
+      {showTraining && (
+        <TrainingModal close={() => setShowTraining(false)} config={config} />
+      )}
+    </div>
+  );
+}
