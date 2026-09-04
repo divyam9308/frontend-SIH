@@ -2,7 +2,7 @@ import { apiGet } from './api';
 import type { ForecastResponse, LifecycleForecastResponse, PeerResponse, ProjectListResponse, ProjectRecord } from '../types/api';
 
 export type ProjectSort = 'name' | 'code' | 'sector' | 'cost' | 'time' | 'score';
-export interface ProjectQuery { page: number; pageSize: number; search?: string; sector?: string; ministry?: string; riskLevel?: string; sort: ProjectSort; direction: 'asc' | 'desc' }
+export interface ProjectQuery { page: number; pageSize: number; search?: string; sector?: string; ministry?: string; riskLevel?: string; sort: ProjectSort; direction: 'asc' | 'desc'; window?: string }
 
 export function getProjects(query: ProjectQuery, signal?: AbortSignal) {
   const params = new URLSearchParams({ page: String(query.page), page_size: String(query.pageSize), sort: query.sort, direction: query.direction });
@@ -10,6 +10,7 @@ export function getProjects(query: ProjectQuery, signal?: AbortSignal) {
   if (query.sector) params.set('sector', query.sector);
   if (query.ministry) params.set('ministry', query.ministry);
   if (query.riskLevel) params.set('risk_level', query.riskLevel);
+  if (query.window) params.set('window', query.window);
   return apiGet<ProjectListResponse>(`/api/projects?${params}`, signal);
 }
 

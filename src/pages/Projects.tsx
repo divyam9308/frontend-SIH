@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { getProjects, type ProjectSort } from '../services/projectService';
 import type { ProjectListResponse, RiskLevel } from '../types/api';
 import '../styles/projects.css';
+import { SAVED_WINDOWS } from '../components/dashboard/FilterBar';
 
 export type RiskCategory = 'Critical' | 'High' | 'Medium' | 'Low';
 const categories: RiskCategory[] = ['Critical', 'High', 'Medium', 'Low'];
@@ -28,17 +29,18 @@ export function Projects() {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<{ key: ProjectSort; direction: 'asc' | 'desc' }>({ key: 'score', direction: 'desc' });
+  const [window, setWindow] = useState('2001_2017');
   const [data, setData] = useState<ProjectListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => { const timer = window.setTimeout(() => { setDebouncedQuery(query.trim()); setPage(1); }, 250); return () => window.clearTimeout(timer); }, [query]);
   useEffect(() => {
     const controller = new AbortController(); setLoading(true); setError(null);
-    getProjects({ page, pageSize: PAGE_SIZE, search: debouncedQuery || undefined, riskLevel: active ?? undefined, sort: sort.key, direction: sort.direction }, controller.signal)
+    getProjects({ page, pageSize: PAGE_SIZE, search: debouncedQuery || undefined, riskLevel: active ?? undefined, sort: sort.key, direction: sort.direction, window }, controller.signal)
       .then(setData).catch((reason: unknown) => { if (reason instanceof DOMException && reason.name === 'AbortError') return; setError(reason instanceof Error ? reason.message : 'Projects are unavailable.'); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [active, debouncedQuery, page, sort]);
+  }, [active, debouncedQuery, page, sort, window]);
   const toggleSort = (key: ProjectSort) => { setPage(1); setSort((previous) => previous.key === key ? { key, direction: previous.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: ['name', 'code', 'sector'].includes(key) ? 'asc' : 'desc' }); };
   const header = (key: ProjectSort, label: string, align = '') => <th className={align}><button onClick={() => toggleSort(key)} className={sort.key === key ? 'is-sorted' : ''}>{label}<ArrowUpDown size={13} /></button></th>;
   const stats = categories.map((category) => { const key = category.toLowerCase() as keyof ProjectListResponse['risk_distribution']; return { category, count: data?.risk_distribution[key] ?? 0, exposure: data?.cost_exposure_by_risk_cr[key] ?? 0 }; });
@@ -47,7 +49,7 @@ export function Projects() {
 
   return <div className="projects-page">
     <div className="projects-heading">
-      <div><p className="projects-eyebrow">Projects</p><h1>Implementation Risk Register</h1><p className="projects-summary">{data?.total ?? '—'} matching projects · dataset {data?.dataset_snapshot ?? 'Unavailable'} · model {data?.model_version ?? 'Unavailable'}</p></div>
+      <div><p className="projects-eyebrow">Projects</p><h1>Implementation Risk Register</h1><p className="projects-summary">{data?.total ?? '—'} matching projects · dataset {data?.dataset_snapshot ?? 'Unavailable'} · model {data?.model_version ?? 'Unavailable'}</p></div><label className="project-window-selector">Saved training range<select value={window} onChange={(event) => { setWindow(event.target.value); setPage(1); }}>{SAVED_WINDOWS.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label>
       <div className="portfolio-card"><p>Portfolio predicted cost exposure</p><strong>{inr(data?.predicted_cost_exposure_cr ?? null)}</strong></div>
     </div>
     <div className="risk-card-grid">{stats.map((stat) => { const selected = active === stat.category; return <button key={stat.category} aria-pressed={selected} className={`risk-card ${riskClass(stat.category)} ${selected ? 'is-active' : ''}`} onClick={() => { setActive(selected ? null : stat.category); setPage(1); }}><div><b>{stat.category}</b><i /></div><strong>{String(stat.count).padStart(2, '0')}</strong><p>{descriptions[stat.category]}</p><div className="risk-progress"><span style={{ width: `${data ? (stat.count / Math.max(1, Object.values(data.risk_distribution).reduce((a, b) => a + b, 0))) * 100 : 0}%` }} /></div><small>{inr(stat.exposure)} predicted overrun</small></button>; })}</div>

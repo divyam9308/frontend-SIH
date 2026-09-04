@@ -4,10 +4,10 @@ import type { PortfolioRiskItem, PortfolioSummaryResponse } from '../types/api';
 
 const inr = (value: number) => `₹${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 1 }).format(value)} Cr`;
 
-export async function getDashboardData(signal?: AbortSignal): Promise<DashboardData> {
+export async function getDashboardData(window = '2001_2017', signal?: AbortSignal): Promise<DashboardData> {
   const [summary, risk] = await Promise.all([
-    apiGet<PortfolioSummaryResponse>('/api/portfolio/summary', signal),
-    apiGet<{ items: PortfolioRiskItem[] }>('/api/portfolio/risk?limit=20', signal),
+    apiGet<PortfolioSummaryResponse>(`/api/portfolio/summary?window=${encodeURIComponent(window)}`, signal),
+    apiGet<{ items: PortfolioRiskItem[] }>(`/api/portfolio/risk?limit=20&window=${encodeURIComponent(window)}`, signal),
   ]);
   const highCritical = summary.risk_distribution.high + summary.risk_distribution.critical;
   const colors: Record<string, string> = { Critical: '#dc2626', High: '#ea580c', Medium: '#ca8a04', Low: '#16a34a' };

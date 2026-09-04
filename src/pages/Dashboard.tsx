@@ -6,12 +6,14 @@ import { PortfolioRiskDistribution } from '../components/dashboard/PortfolioRisk
 import { ExpenditureProgressChart } from '../components/dashboard/ExpenditureProgressChart';
 import { WarningDriversChart } from '../components/dashboard/WarningDriversChart';
 import { Card } from '../components/ui/Card';
+import { useState } from 'react';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useFilters } from '../hooks/useFilters';
 
 export function Dashboard() {
+  const [window, setWindow] = useState('2001_2017');
   const { filters, setFilter, resetFilters } = useFilters();
-  const { data, loading, error, refresh } = useDashboardData();
+  const { data, loading, error, refresh } = useDashboardData(window);
   const sectors = data ? [...new Set(data.projects.map((project) => project.sector))].sort() : [];
   const projects = data?.projects.filter((project) =>
     (filters.sector === 'All Sectors' || project.sector === filters.sector) &&
@@ -19,7 +21,7 @@ export function Dashboard() {
   ) ?? [];
   return <>
     <Header onRefresh={refresh} datasetSnapshot={data?.datasetSnapshot ?? null} available={!error && Boolean(data)} />
-    <FilterBar filters={filters} setFilter={setFilter} reset={resetFilters} sectors={sectors} />
+    <FilterBar filters={filters} setFilter={setFilter} reset={resetFilters} sectors={sectors} window={window} onWindowChange={setWindow} />
     <div className="p-6">
       {loading && !data && <Card>Loading real PAIMANA portfolio predictions…</Card>}
       {error && <Card className="border-red-200 text-sm text-red-700"><b>Backend data unavailable.</b><p className="mt-1">{error}</p><button className="mt-3 text-blue-700" onClick={refresh}>Try again</button></Card>}
