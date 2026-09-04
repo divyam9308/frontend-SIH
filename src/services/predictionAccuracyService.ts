@@ -1,14 +1,31 @@
-export type ProjectEvidence={id:string;name:string;sector:string;actualCost:number;predictedCost:number;actualDelay:number;predictedDelay:number;actualRisk:string;predictedRisk:string;confidence:number};
-export type EvaluationRun={id:string;name:string;training:string;holdout:string;costOffset:number;delayOffset:number};
-export const evaluationRuns:EvaluationRun[]=[{id:'default',name:'Default Lifecycle Run',training:'2001–2015',holdout:'2016–2020',costOffset:0,delayOffset:0},{id:'recalibrated',name:'Recalibrated Lifecycle Run',training:'2001–2016',holdout:'2017–2020',costOffset:-2,delayOffset:-8}];
-const base:ProjectEvidence[]=[
- {id:'PM-001',name:'NH-44 Highway Upgrade',sector:'Roads',actualCost:42,predictedCost:37,actualDelay:420,predictedDelay:390,actualRisk:'High',predictedRisk:'High',confidence:0.86},
- {id:'PM-014',name:'Eastern Freight Corridor',sector:'Rail',actualCost:68,predictedCost:73,actualDelay:680,predictedDelay:715,actualRisk:'Critical',predictedRisk:'Critical',confidence:0.91},
- {id:'PM-027',name:'Kaveri Water Grid',sector:'Water',actualCost:18,predictedCost:22,actualDelay:145,predictedDelay:169,actualRisk:'Moderate',predictedRisk:'Moderate',confidence:0.79},
- {id:'PM-038',name:'Coastal Solar Park',sector:'Energy',actualCost:8,predictedCost:4,actualDelay:48,predictedDelay:32,actualRisk:'Low',predictedRisk:'Low',confidence:0.83},
- {id:'PM-052',name:'Metro Phase III',sector:'Urban',actualCost:53,predictedCost:46,actualDelay:510,predictedDelay:448,actualRisk:'High',predictedRisk:'Moderate',confidence:0.68},
- {id:'PM-061',name:'Regional Airport Extension',sector:'Aviation',actualCost:31,predictedCost:35,actualDelay:272,predictedDelay:298,actualRisk:'Moderate',predictedRisk:'High',confidence:0.72},
- {id:'PM-075',name:'North Port Modernisation',sector:'Ports',actualCost:76,predictedCost:70,actualDelay:810,predictedDelay:755,actualRisk:'Critical',predictedRisk:'Critical',confidence:0.89},
- {id:'PM-083',name:'State Medical College',sector:'Social',actualCost:12,predictedCost:15,actualDelay:96,predictedDelay:112,actualRisk:'Low',predictedRisk:'Low',confidence:0.81},
- ];
-export const getPredictionAccuracyData=(run:EvaluationRun)=>({run,projects:base.map(p=>({...p,predictedCost:p.predictedCost+run.costOffset,predictedDelay:p.predictedDelay+run.delayOffset})),prototype:true});
+import { apiGet } from './api';
+
+export interface ValidationReport {
+  model_version: string;
+  cost_model: { MAE: number; RMSE: number; R2: number; MAPE: number };
+  delay_model: { MAE: number; MAE_days?: number; RMSE: number; R2: number; MAPE?: number };
+  risk_model: { accuracy: number; precision?: number; macro_precision?: number; recall?: number; macro_recall?: number; f1?: number; macro_f1?: number };
+  metadata: { training_start: number; training_end: number; test_start: number; test_end: number; testing_samples?: number; data_source?: string; validation_method?: string; features_used?: string[]; confidence_calibration_status?: string };
+}
+export interface ValidationRow {
+  project_id: string | null; project_name: string; sector: string; predicted_cost_overrun: number; actual_cost_overrun: number;
+  cost_error: number; predicted_delay_days: number; actual_delay_days: number; delay_error: number;
+  predicted_risk: number | string; actual_risk: number | string; risk_probability: number | null; model_confidence_percentage: number | null;
+}
+export interface RollingFold { test_year: number; cost_MAE: number; delay_MAE_days: number; risk_f1: number }
+export interface ModelImportance { feature: string; importance: number }
+export interface PredictionAccuracyData {
+  report: ValidationReport; rows: ValidationRow[]; total: number;
+  rolling: { model_version: string; folds: RollingFold[]; fold_count: number; policy?: string };
+  importance: { model_version: string; cost_model: ModelImportance[]; delay_model: ModelImportance[]; risk_model: ModelImportance[] };
+}
+
+export async function getPredictionAccuracyData(signal?: AbortSignal): Promise<PredictionAccuracyData> {
+  const [report, evidence, rolling, importance] = await Promise.all([
+    apiGet<ValidationReport>('/api/models/validation', signal),
+    apiGet<{ model_version: string; items: ValidationRow[]; total: number }>('/api/models/prediction-validation?limit=500', signal),
+    apiGet<PredictionAccuracyData['rolling']>('/api/models/rolling-validation', signal),
+    apiGet<PredictionAccuracyData['importance']>('/api/models/importance', signal),
+  ]);
+  return { report, rows: evidence.items, total: evidence.total, rolling, importance };
+}

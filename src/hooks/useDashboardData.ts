@@ -1,2 +1,21 @@
-import { useCallback,useState } from 'react'; import { getDashboardData,refreshDashboardData } from '../services/dashboardService'; import type { DashboardData } from '../types/dashboard'; import type { DashboardFilters } from '../types/filters';
-export const useDashboardData=(filters?:DashboardFilters)=>{const [data,setData]=useState<DashboardData>(()=>getDashboardData(filters)); const refresh=useCallback(()=>setData(refreshDashboardData(filters)),[filters]); return {data,refresh}}
+import { useCallback, useEffect, useState } from 'react';
+import { getDashboardData } from '../services/dashboardService';
+import type { DashboardData } from '../types/dashboard';
+
+export function useDashboardData() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const refresh = useCallback(() => setRefreshKey((value) => value + 1), []);
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true); setError(null);
+    getDashboardData(controller.signal).then(setData).catch((reason: unknown) => {
+      if (reason instanceof DOMException && reason.name === 'AbortError') return;
+      setError(reason instanceof Error ? reason.message : 'Dashboard data is unavailable.');
+    }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [refreshKey]);
+  return { data, loading, error, refresh };
+}
