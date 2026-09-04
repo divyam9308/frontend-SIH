@@ -31,7 +31,8 @@ export interface ProjectListItem {
   project_code: string; project_name: string; sector: string; ministry: string | null; implementing_agency: string | null;
   snapshot_date: string; original_cost_cr: number | null; revised_cost_cr: number | null; expenditure_cr: number | null;
   physical_progress_pct: number | null; predicted_cost_overrun_percentage: number; predicted_cost_overrun_amount_cr: number;
-  predicted_final_cost_cr: number; predicted_delay_days: number; predicted_delay_months: number; predicted_completion_date: string;
+  predicted_final_cost_cr: number; predicted_delay_days: number; predicted_delay_months: number; predicted_completion_date: string | null;
+  actual_cost_overrun_percentage?: number | null; actual_delay_days?: number | null; cost_error_percentage?: number | null; delay_error_percentage?: number | null;
   risk_score: number; risk_probability_percentage: number; risk_level: RiskLevel; model_version: string; model_scope: string;
   inference_timestamp: string; model_confidence_percentage: number | null; confidence_calibration_status: string;
 }

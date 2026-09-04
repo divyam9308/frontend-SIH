@@ -6,12 +6,17 @@ import { PortfolioRiskDistribution } from '../components/dashboard/PortfolioRisk
 import { ExpenditureProgressChart } from '../components/dashboard/ExpenditureProgressChart';
 import { WarningDriversChart } from '../components/dashboard/WarningDriversChart';
 import { Card } from '../components/ui/Card';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useFilters } from '../hooks/useFilters';
+import { SAVED_WINDOW_STORAGE_KEY, SAVED_WINDOWS } from '../components/dashboard/FilterBar';
 
 export function Dashboard() {
-  const [window, setWindow] = useState('2001_2017');
+  const [window, setWindow] = useState(() => {
+    const stored = globalThis.localStorage?.getItem(SAVED_WINDOW_STORAGE_KEY);
+    return stored && SAVED_WINDOWS.some((item) => item.key === stored) ? stored : '2001_2017';
+  });
+  useEffect(() => { globalThis.localStorage?.setItem(SAVED_WINDOW_STORAGE_KEY, window); }, [window]);
   const { filters, setFilter, resetFilters } = useFilters();
   const { data, loading, error, refresh } = useDashboardData(window);
   const sectors = data ? [...new Set(data.projects.map((project) => project.sector))].sort() : [];
